@@ -8,6 +8,7 @@ width: i32 = 1920
 height: i32 = 1080
 canvas: []rl.Color
 render_complete: bool
+
 main :: proc() {
 	canvas = make([]rl.Color, width * height)
 	defer delete(canvas)
@@ -32,7 +33,7 @@ main :: proc() {
 	render_start := rl.GetTime()
 	thread.start(render_thread)
 	texture_uploaded := false
-	render_time := rl.GetTime() // find out what type this is
+	render_time: f64
 
 	for !rl.WindowShouldClose() {
 		rl.BeginDrawing()
@@ -65,25 +66,11 @@ main :: proc() {
 }
 
 render_thread_proc :: proc(t: ^thread.Thread) {
-	// Room
-	floor := make_sphere()
-	floor.transform = scale(10, 0.01, 10)
-	floor.material = material()
-	floor.material.color = Color{1, 0.9, 0.9}
-	floor.material.specular = 0
-
-	left_wall := make_sphere()
-	left_wall.transform =
-		translate(0, 0, 5) * rot_y(-math.PI / 4) * rot_x(math.PI / 2) * scale(10, 0.01, 10)
-	left_wall.material = floor.material
-
-	right_wall := make_sphere()
-	right_wall.transform =
-		translate(0, 0, 5) * rot_y(math.PI / 4) * rot_x(math.PI / 2) * scale(10, 0.01, 10)
-	right_wall.material = floor.material
+	// Floor
+	floor := make_shape(.Plane)
 	// Spheres
 	middle := make_sphere()
-	middle.transform = translate(-0.5, 1, 0.5)
+	middle.transform = translate(-0.5, 0, 20.5)
 	middle.material = material()
 	middle.material.color = Color{0.1, 1, 0.5}
 	middle.material.diffuse = 0.7
@@ -104,8 +91,6 @@ render_thread_proc :: proc(t: ^thread.Thread) {
 
 	scene: Scene
 	append(&scene.shapes, floor)
-	append(&scene.shapes, left_wall)
-	append(&scene.shapes, right_wall)
 	append(&scene.shapes, middle)
 	append(&scene.shapes, right)
 	append(&scene.shapes, left)

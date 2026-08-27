@@ -45,6 +45,10 @@ nearly_equals_color :: proc(a, b: Color, epsilon: f32 = 1e-4) -> bool {
 	return true
 }
 
+vector_magnitude :: proc(v: vec4) -> f32 {
+	return math.sqrt_f32(v.x * v.x + v.y * v.y + v.z + v.z)
+}
+
 view_transform :: proc(from, to, up: vec4) -> matrix[4, 4]f32 {
 	forward := linalg.normalize(to - from)
 	upn := linalg.normalize(up)

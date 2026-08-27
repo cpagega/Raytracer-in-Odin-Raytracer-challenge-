@@ -32,12 +32,13 @@ Intersection :: struct {
 }
 
 Computations :: struct {
-	t:      f32,
-	shape:  Shape,
-	point:  vec4,
-	eyev:   vec4,
-	normv:  vec4,
-	inside: bool,
+	t:          f32,
+	shape:      Shape,
+	point:      vec4,
+	eyev:       vec4,
+	normv:      vec4,
+	inside:     bool,
+	over_point: vec4,
 }
 
 new_camera :: proc(width, height, fov: f32) -> Camera {
@@ -71,7 +72,7 @@ render :: proc(c: Camera, s: Scene, canvas: ^[]rl.Color) {
 }
 
 ray_for_pixel :: proc(c: Camera, px, py: f32) -> Ray {
-	// off from the edge of the canvas to the pixel's center
+	// offset from the edge of the canvas to the pixel's center
 	xoffset := (px + 0.5) * c.pixel_size
 	yoffset := (py + 0.5) * c.pixel_size
 	// untransformed coordinates of the pixel in world space
@@ -101,12 +102,20 @@ prepare_computations :: proc(i: Intersection, r: Ray) -> Computations {
 	} else {
 		comps.inside = false
 	}
+	comps.over_point = comps.point + comps.normv * 1E-2
 	return comps
 }
 
 // Passing a scene rather than a light because a scene can eventually support multiple light sources
 shade_hit :: proc(scene: Scene, comps: Computations) -> Color {
-	return lighting(comps.shape.material, scene.light, comps.point, comps.eyev, comps.normv)
+	return lighting(
+		comps.shape.material,
+		scene.light,
+		comps.point,
+		comps.eyev,
+		comps.normv,
+		is_shadowed(scene, comps.over_point),
+	)
 }
 // Right now color_at is the owner of interesections but we may need to rethink this when we get to reflections
 color_at :: proc(scene: Scene, ray: Ray) -> Color {
@@ -148,4 +157,22 @@ hit :: proc(xs: [dynamic]Intersection) -> (Intersection, bool) {
 		}
 	}
 	return {}, false
+}
+
+// Determine if an object is between the point and light source.
+is_shadowed :: proc(scene: Scene, point: vec4) -> bool {
+	// find the direction and distance from the point to the light source
+	v := scene.light.position - point
+	distance := vector_magnitude(v)
+	direction := linalg.normalize(v)
+	r: Ray
+	r.origin = point
+	r.direction = direction
+	// Cast a shadow ray from the point towards the light source and collect all interesections
+	i := intersect_scene(scene, r)
+	defer delete(i)
+	// Check if there were any hits
+	x, hit := hit(i)
+	// if there was a hit and it is between the light and the point, then the point is in shadow
+	return hit && x.t < distance
 }

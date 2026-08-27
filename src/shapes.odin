@@ -3,22 +3,17 @@ package main
 import "core:math"
 import "core:math/linalg"
 
-Plane :: struct {
-	id: uint,
+Shape_Kind :: enum {
+	Sphere,
+	Plane,
 }
-
-Sphere :: struct {
-	id: uint,
-}
-
 Shape :: struct {
-	//TODO: consider switching to an enum and moving id to shape
-	data:      union {
-		Sphere,
-		Plane,
-	},
-	transform: matrix[4, 4]f32,
-	material:  Material,
+	kind:            Shape_Kind,
+	transform:       matrix[4, 4]f32,
+	material:        Material,
+	id:              uint,
+	local_normal_at: proc(s: Shape, p: vec4) -> vec4,
+	local_intersect: proc(s: Shape, r: Ray, xs: ^[dynamic]Intersection),
 }
 
 intersection :: proc(shape: Shape, t: f32) -> Intersection {
@@ -29,7 +24,7 @@ intersection :: proc(shape: Shape, t: f32) -> Intersection {
 }
 
 /*Intersect a unit sphere with a transformed ray*/
-intersect_sphere :: proc(s: ^Sphere, owner: Shape, r: Ray, xs: ^[dynamic]Intersection) {
+intersect_sphere :: proc(s: Shape, r: Ray, xs: ^[dynamic]Intersection) {
 	sphere_to_ray := r.origin - point(0.0, 0.0, 0.0)
 	a := dot(r.direction, r.direction)
 	b := 2 * dot(r.direction, sphere_to_ray)
@@ -40,19 +35,30 @@ intersect_sphere :: proc(s: ^Sphere, owner: Shape, r: Ray, xs: ^[dynamic]Interse
 	}
 	t1 := (-b - math.sqrt(discriminant)) / (2 * a)
 	t2 := (-b + math.sqrt(discriminant)) / (2 * a)
-	append(xs, intersection(owner, t1))
-	append(xs, intersection(owner, t2))
+	append(xs, intersection(s, t1))
+	append(xs, intersection(s, t2))
+}
+// Intersect xz plane
+intersect_plane :: proc(s: Shape, r: Ray, xs: ^[dynamic]Intersection) {
+	if math.abs(r.direction.y) < 1E-5 {
+		return
+	}
+	t := -r.origin.y / r.direction.y
+	append(xs, intersection(s, t))
 }
 
 intersect :: proc(shape: Shape, r: Ray, xs: ^[dynamic]Intersection) {
-	#partial switch &data in shape.data {
-	case Sphere:
-		m := linalg.inverse(shape.transform)
-		trans_r := transform(r, m)
-		intersect_sphere(&data, shape, trans_r, xs)
-	}
+	// before intersecting a shape, the ray is transformed based on the shapes characteristics into object space
+	transformed_ray := ray_to_object_space(r, shape.transform)
+	shape.local_intersect(shape, transformed_ray, xs)
 }
 
+ray_to_object_space :: proc(r: Ray, m: matrix[4, 4]f32) -> Ray {
+	inverse_m := linalg.inverse(m)
+	return transform(r, inverse_m)
+}
+
+// Applies a shape's transform matrix  to a Ray
 transform :: proc(r: Ray, m: matrix[4, 4]f32) -> Ray {
 	temp := Ray {
 		origin    = m * r.origin,
@@ -61,21 +67,42 @@ transform :: proc(r: Ray, m: matrix[4, 4]f32) -> Ray {
 	return temp
 }
 
+// this is  just to keep some old test cases from breaking, make shape should be used otherwise
 make_sphere :: proc(id: uint = 1) -> Shape {
+	return make_shape(.Sphere)
+}
+
+make_shape :: proc(kind: Shape_Kind, id: uint = 1) -> Shape {
 	shape: Shape
-	shape.data = Sphere {
-		id = id,
-	}
+	shape.kind = kind
+	shape.id = id
 	shape.transform = identity_matrix()
 	shape.material = material()
+	#partial switch kind {
+	case .Sphere:
+		shape.local_intersect = intersect_sphere
+		shape.local_normal_at = normal_at_sphere
+	case .Plane:
+		shape.local_intersect = intersect_plane
+		shape.local_normal_at = normal_at_plane
+	}
 	return shape
 }
 
+normal_at_sphere :: proc(s: Shape, p: vec4) -> vec4 {
+	return p - point(0.0, 0.0, 0.0)
+}
+
+normal_at_plane :: proc(s: Shape, p: vec4) -> vec4 {
+	return vector(0, 1, 0)
+}
+
 normal_at :: proc(s: Shape, p: vec4) -> vec4 {
-	inverse_t := linalg.inverse(s.transform)
-	object_point := inverse_t * p
-	object_normal := object_point - point(0.0, 0.0, 0.0)
-	world_normal := linalg.transpose(inverse_t) * object_normal
+	inverse_transform := linalg.inverse(s.transform)
+	local_point := inverse_transform * p
+	local_normal: vec4
+	local_normal = s.local_normal_at(s, local_point)
+	world_normal := linalg.transpose(inverse_transform) * local_normal
 	world_normal.w = 0.0
 	return linalg.normalize(world_normal)
 }

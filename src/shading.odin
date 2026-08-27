@@ -8,6 +8,7 @@ lighting :: proc(
 	hit_point: vec4,
 	eyev: vec4,
 	normv: vec4,
+	in_shadow: bool = false,
 ) -> Color {
 	// combine the surface color with the light's color/intensity
 	effective_color := material.color * light.intensity
@@ -26,7 +27,7 @@ lighting :: proc(
 	diffuse: Color
 	specular: Color
 	black := Color{0, 0, 0}
-	if light_dot_normal < 0 {
+	if light_dot_normal < 0 || in_shadow {
 		diffuse = black
 		specular = black
 	} else {

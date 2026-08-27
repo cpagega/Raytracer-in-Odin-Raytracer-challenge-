@@ -11,8 +11,8 @@ test_scene :: proc() -> Scene {
 		light  = point_light(point(-10, 10, -10), Color{1, 1, 1}),
 	}
 
-	s1 := make_sphere()
-	s2 := make_sphere()
+	s1 := make_shape(.Sphere)
+	s2 := make_shape(.Sphere)
 
 	s1.material.color = {0.8, 1.0, 0.6}
 	s1.material.diffuse = 0.7
@@ -22,6 +22,106 @@ test_scene :: proc() -> Scene {
 	append(&scene.shapes, s1)
 	append(&scene.shapes, s2)
 	return scene
+}
+@(test)
+normal_of_plane_constant :: proc(t: ^testing.T) {
+	plane := make_shape(.Plane)
+	n1 := plane.local_normal_at(plane, point(0, 0, 0))
+	n2 := plane.local_normal_at(plane, point(10, 0, -10))
+	n3 := plane.local_normal_at(plane, point(-5, 0, 150))
+	testing.expect_value(t, n1, vector(0, 1, 0))
+	testing.expect_value(t, n2, vector(0, 1, 0))
+	testing.expect_value(t, n3, vector(0, 1, 0))
+}
+
+@(test)
+intersect_with_ray_parallel_to_plane :: proc(t: ^testing.T) {
+	plane := make_shape(.Plane)
+	r: Ray
+	r.origin = point(0, 10, 0)
+	r.direction = vector(0, 0, 1)
+	xs := make([dynamic]Intersection)
+	defer delete(xs)
+	plane.local_intersect(plane, r, &xs)
+	testing.expect_value(t, len(xs), 0)
+}
+
+@(test)
+intersect_with_coplanar_ray :: proc(t: ^testing.T) {
+	plane := make_shape(.Plane)
+	r: Ray
+	r.origin = point(0, 0, 0)
+	r.direction = vector(0, 0, 1)
+	xs := make([dynamic]Intersection)
+	defer delete(xs)
+	testing.expect_value(t, len(xs), 0)
+}
+
+@(test)
+intersect_plane_from_above :: proc(t: ^testing.T) {
+	plane := make_shape(.Plane)
+	r: Ray
+	r.origin = point(0, 1, 0)
+	r.direction = vector(0, -1, 0)
+	xs := make([dynamic]Intersection)
+	defer delete(xs)
+	plane.local_intersect(plane, r, &xs)
+	testing.expect_value(t, len(xs), 1)
+	testing.expect_value(t, xs[0].t, 1.0)
+}
+
+@(test)
+intersect_plane_from_below :: proc(t: ^testing.T) {
+	plane := make_shape(.Plane)
+	r: Ray
+	r.origin = point(0, -1, 0)
+	r.direction = vector(0, 1, 0)
+	xs := make([dynamic]Intersection)
+	defer delete(xs)
+	plane.local_intersect(plane, r, &xs)
+	testing.expect_value(t, len(xs), 1)
+	testing.expect_value(t, xs[0].t, 1.0)
+}
+@(test)
+no_shadow_when_nothing_collinear :: proc(t: ^testing.T) {
+	w := test_scene()
+	p := point(0, 10, 0)
+	result := is_shadowed(w, p)
+	testing.expect_value(t, result, false)
+}
+
+@(test)
+shadow_when_object_between_point_light :: proc(t: ^testing.T) {
+	w := test_scene()
+	p := point(10, -10, 10)
+	result := is_shadowed(w, p)
+	testing.expect_value(t, result, true)
+}
+
+@(test)
+no_shadow_object_behind_light :: proc(t: ^testing.T) {
+	w := test_scene()
+	p := point(-20, 20, -20)
+	result := is_shadowed(w, p)
+	testing.expect_value(t, result, false)
+}
+
+@(test)
+no_shadow_object_behind_point :: proc(t: ^testing.T) {
+	w := test_scene()
+	p := point(-2, 2, -2)
+	result := is_shadowed(w, p)
+	testing.expect_value(t, result, false)
+}
+
+@(test)
+lighting_with_the_surface_in_shadow :: proc(t: ^testing.T) {
+	eyev := vector(0, 0, -1)
+	normalv := vector(0, 0, -1)
+	light := point_light(point(0, 0, -10), Color{1, 1, 1})
+	in_shadow := true
+	result := lighting(material(), light, point(0, 0, 0), eyev, normalv, in_shadow)
+	testing.expect_value(t, nearly_equals(result, Color{0.1, 0.1, 0.1}), true)
 }
 
 @(test)
@@ -43,8 +143,6 @@ render_world_with_a_camera :: proc(t: ^testing.T) {
 	}
 	//
 	testing.expect_value(t, nearly_equals(rendered_color, Color{0.38066, 0.47583, 0.2855}), true)
-	testing.expect_value(t, rendered_color, Color{0.38066, 0.47583, 0.2855})
-
 }
 
 @(test)
@@ -246,7 +344,7 @@ lighting_eye_between_light_and_surface :: proc(t: ^testing.T, m: Material, p: ve
 	eyev := vector(0, 0, -1)
 	normv := vector(0, 0, -1)
 	light := point_light(point(0, 0, -10), Color{1, 1, 1})
-	result := lighting(m, light, p, eyev, normv)
+	result := lighting(m, light, p, eyev, normv, false)
 	testing.expect_value(t, nearly_equals(result, Color{1.9, 1.9, 1.9}), true)
 }
 
@@ -255,7 +353,7 @@ lighting_eye_between_light_and_surface_eye_45 :: proc(t: ^testing.T, m: Material
 	eyev := vector(0, x, -x)
 	normv := vector(0, 0, -1)
 	light := point_light(point(0, 0, -10), Color{1, 1, 1})
-	result := lighting(m, light, p, eyev, normv)
+	result := lighting(m, light, p, eyev, normv, false)
 	testing.expect_value(t, nearly_equals(result, Color{1, 1, 1}), true)
 }
 
@@ -263,7 +361,7 @@ lighting_eye_opposite_surface_light_45 :: proc(t: ^testing.T, m: Material, p: ve
 	eyev := vector(0, 0, -1)
 	normv := vector(0, 0, -1)
 	light := point_light(point(0, 10, -10), Color{1, 1, 1})
-	result := lighting(m, light, p, eyev, normv)
+	result := lighting(m, light, p, eyev, normv, false)
 	testing.expect_value(t, nearly_equals(result, Color{0.7364, 0.7364, 0.7364}), true)
 }
 
@@ -272,7 +370,7 @@ lighting_eye_inpath_reflection_vector :: proc(t: ^testing.T, m: Material, p: vec
 	eyev := vector(0, -x, -x)
 	normv := vector(0, 0, -1)
 	light := point_light(point(0, 10, -10), Color{1, 1, 1})
-	result := lighting(m, light, p, eyev, normv)
+	result := lighting(m, light, p, eyev, normv, false)
 	testing.expect_value(t, nearly_equals(result, Color{1.6364, 1.6364, 1.6364}), true)
 }
 
@@ -280,7 +378,7 @@ lighting_light_behind_surface :: proc(t: ^testing.T, m: Material, p: vec4) {
 	eyev := vector(0, 0, -1)
 	normv := vector(0, 0, -1)
 	light := point_light(point(0, 0, 10), Color{1, 1, 1})
-	result := lighting(m, light, p, eyev, normv)
+	result := lighting(m, light, p, eyev, normv, false)
 	testing.expect_value(t, nearly_equals(result, Color{0.1, 0.1, 0.1}), true)
 }
 @(test)
@@ -391,8 +489,6 @@ intersection_stores_t_and_shape :: proc(t: ^testing.T) {
 @(test)
 intersecting_a_scaled_sphere_with_a_ray :: proc(t: ^testing.T) {
 	shape := make_sphere(104)
-	sphere := &shape.data.(Sphere)
-
 	r := Ray {
 		origin    = point(0.0, 0.0, -5.0),
 		direction = vector(0.0, 0.0, 1.0),
@@ -410,8 +506,6 @@ intersecting_a_scaled_sphere_with_a_ray :: proc(t: ^testing.T) {
 @(test)
 intersecting_a_translated_sphere_with_a_ray :: proc(t: ^testing.T) {
 	shape := make_sphere(123)
-	sphere := &shape.data.(Sphere)
-
 	r := Ray {
 		origin    = point(0.0, 0.0, -5.0),
 		direction = vector(0.0, 0.0, 1.0),
@@ -428,8 +522,6 @@ intersecting_a_translated_sphere_with_a_ray :: proc(t: ^testing.T) {
 @(test)
 ray_intersects_sphere_at_two_points :: proc(t: ^testing.T) {
 	shape := make_sphere(141)
-	sphere := &shape.data.(Sphere)
-
 	r := Ray {
 		origin    = point(0.0, 0.0, -5.0),
 		direction = vector(0.0, 0.0, 1.0),
@@ -453,8 +545,6 @@ ray_intersects_sphere_at_two_points :: proc(t: ^testing.T) {
 @(test)
 ray_intersects_sphere_at_tangent :: proc(t: ^testing.T) {
 	shape := make_sphere(174)
-	sphere := &shape.data.(Sphere)
-
 	r := Ray {
 		origin    = point(0.0, 1.0, -5.0),
 		direction = vector(0.0, 0.0, 1.0),
@@ -474,8 +564,6 @@ ray_intersects_sphere_at_tangent :: proc(t: ^testing.T) {
 @(test)
 ray_misses_sphere :: proc(t: ^testing.T) {
 	shape := make_sphere(195)
-	sphere := &shape.data.(Sphere)
-
 	r := Ray {
 		origin    = point(0.0, 2.0, -5.0),
 		direction = vector(0.0, 0.0, 1.0),
@@ -493,13 +581,10 @@ ray_misses_sphere :: proc(t: ^testing.T) {
 @(test)
 ray_originates_inside_sphere :: proc(t: ^testing.T) {
 	shape := make_sphere(214)
-	sphere := &shape.data.(Sphere)
-
 	r := Ray {
 		origin    = point(0.0, 0.0, 0.0),
 		direction = vector(0.0, 0.0, 1.0),
 	}
-
 	xs := make([dynamic]Intersection)
 	defer delete(xs)
 
@@ -514,8 +599,6 @@ ray_originates_inside_sphere :: proc(t: ^testing.T) {
 @(test)
 sphere_is_behind_ray :: proc(t: ^testing.T) {
 	shape := make_sphere(235)
-	sphere := &shape.data.(Sphere)
-
 	r := Ray {
 		origin    = point(0.0, 0.0, 5.0),
 		direction = vector(0.0, 0.0, 1.0),
