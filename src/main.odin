@@ -70,24 +70,24 @@ render_thread_proc :: proc(t: ^thread.Thread) {
 	floor := make_shape(.Plane)
 	// Spheres
 	middle := make_sphere()
-	middle.transform = translate(-0.5, 0, 20.5)
 	middle.material = material()
 	middle.material.color = Color{0.1, 1, 0.5}
 	middle.material.diffuse = 0.7
 	middle.material.specular = 0.3
+	set_transform(&middle, translate(-0.5, 0, 20.5))
 
 	right := make_sphere()
-	right.transform = translate(1.5, 0.5, -0.5) * scale(0.5, 0.5, 0.5)
 	right.material = material()
 	right.material.color = Color{0.5, 1, 0.1}
 	right.material.diffuse = 0.7
 	right.material.specular = 0.3
+	set_transform(&right, translate(1.5, 0.5, -0.5) * scale(0.5, 0.5, 0.5))
 
 	left := make_sphere()
-	left.transform = translate(-1.5, 0.33, -0.75) * scale(0.33, 0.33, 0.33)
 	left.material.color = Color{1, 0.8, 0.1}
 	left.material.diffuse = 0.7
 	left.material.specular = 0.3
+	set_transform(&left, translate(-1.5, 0.33, -0.75) * scale(0.33, 0.33, 0.33))
 
 	scene: Scene
 	append(&scene.shapes, floor)

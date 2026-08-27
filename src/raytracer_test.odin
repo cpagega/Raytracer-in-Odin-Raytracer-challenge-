@@ -17,12 +17,14 @@ test_scene :: proc() -> Scene {
 	s1.material.color = {0.8, 1.0, 0.6}
 	s1.material.diffuse = 0.7
 	s1.material.specular = 0.2
-	s2.transform = scale(0.5, 0.5, 0.5)
+	set_transform(&s2, scale(0.5, 0.5, 0.5))
 
 	append(&scene.shapes, s1)
 	append(&scene.shapes, s2)
 	return scene
 }
+
+
 @(test)
 normal_of_plane_constant :: proc(t: ^testing.T) {
 	plane := make_shape(.Plane)
@@ -162,7 +164,7 @@ ray_through_corner_of_canvas :: proc(t: ^testing.T) {
 }
 
 @(test)
-ray_when_camera_is_transformed :: proc(t: ^testing.T) {
+ray_when_camera_is_ed :: proc(t: ^testing.T) {
 	sqrt2over2 := math.sqrt_f32(2) / 2
 	c := new_camera(201, 101, math.PI / 2.0)
 	c.transform = rot_y(math.PI / 4.0) * translate(0, -2, 5)
@@ -184,7 +186,7 @@ pixel_size_vertical_canvas :: proc(t: ^testing.T) {
 }
 
 @(test)
-view_transform_default :: proc(t: ^testing.T) {
+view__default :: proc(t: ^testing.T) {
 	from := point(0, 0, 0)
 	to := point(0, 0, -1)
 	up := vector(0, 1, 0)
@@ -193,7 +195,7 @@ view_transform_default :: proc(t: ^testing.T) {
 }
 
 @(test)
-view_transform_positive_z :: proc(t: ^testing.T) {
+view__positive_z :: proc(t: ^testing.T) {
 	from := point(0, 0, 0)
 	to := point(0, 0, 1)
 	up := vector(0, 1, 0)
@@ -202,7 +204,7 @@ view_transform_positive_z :: proc(t: ^testing.T) {
 }
 
 @(test)
-view_transform_translate :: proc(t: ^testing.T) {
+view__translate :: proc(t: ^testing.T) {
 	from := point(0, 0, 8)
 	to := point(0, 0, 0)
 	up := vector(0, 1, 0)
@@ -211,7 +213,7 @@ view_transform_translate :: proc(t: ^testing.T) {
 }
 
 @(test)
-view_transform_arbitrary :: proc(t: ^testing.T) {
+view__arbitrary :: proc(t: ^testing.T) {
 	from := point(1, 3, 2)
 	to := point(4, -2, 8)
 	up := vector(1, 1, 0)
@@ -421,15 +423,15 @@ normal_is_normalized :: proc(t: ^testing.T) {
 @(test)
 normal_at_translated :: proc(t: ^testing.T) {
 	s := make_sphere(56)
-	s.transform = translate(0.0, 1.0, 0.0)
+	set_transform(&s, translate(0.0, 1.0, 0.0))
 	n := normal_at(s, point(0.0, 1.70711, -0.70711))
 	testing.expect_value(t, nearly_equals(n, vector(0.0, 0.70711, -0.70711)), true)
 }
 
 @(test)
-normal_at_transformed :: proc(t: ^testing.T) {
+normal_at_ed :: proc(t: ^testing.T) {
 	s := make_sphere(64)
-	s.transform = scale(1.0, 0.5, 1.0) * rot_z(math.PI / 5.0)
+	set_transform(&s, scale(1.0, 0.5, 1.0) * rot_z(math.PI / 5.0))
 	x := math.sqrt_f32(2.0) / 2.0
 	n := normal_at(s, point(0.0, x, -x))
 	testing.expect_value(t, nearly_equals(n, vector(0.0, 0.97014, -0.24254)), true)
@@ -493,7 +495,7 @@ intersecting_a_scaled_sphere_with_a_ray :: proc(t: ^testing.T) {
 		origin    = point(0.0, 0.0, -5.0),
 		direction = vector(0.0, 0.0, 1.0),
 	}
-	shape.transform = scale(2.0, 2.0, 2.0)
+	set_transform(&shape, scale(2.0, 2.0, 2.0))
 	xs := make([dynamic]Intersection)
 	defer delete(xs)
 
@@ -510,7 +512,7 @@ intersecting_a_translated_sphere_with_a_ray :: proc(t: ^testing.T) {
 		origin    = point(0.0, 0.0, -5.0),
 		direction = vector(0.0, 0.0, 1.0),
 	}
-	shape.transform = translate(5.0, 0.0, 0.0)
+	set_transform(&shape, translate(5.0, 0.0, 0.0))
 	xs := make([dynamic]Intersection)
 	defer delete(xs)
 
