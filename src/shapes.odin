@@ -8,12 +8,13 @@ Shape_Kind :: enum {
 	Plane,
 }
 Shape :: struct {
-	kind:            Shape_Kind,
-	transform:       matrix[4, 4]f32,
-	material:        Material,
-	id:              uint,
-	local_normal_at: proc(s: Shape, p: vec4) -> vec4,
-	local_intersect: proc(s: Shape, r: Ray, xs: ^[dynamic]Intersection),
+	kind:              Shape_Kind,
+	transform:         matrix[4, 4]f32,
+	inverse_transform: matrix[4, 4]f32,
+	material:          Material,
+	id:                uint,
+	local_normal_at:   proc(s: Shape, p: vec4) -> vec4,
+	local_intersect:   proc(s: Shape, r: Ray, xs: ^[dynamic]Intersection),
 }
 
 intersection :: proc(shape: Shape, t: f32) -> Intersection {
@@ -49,13 +50,12 @@ intersect_plane :: proc(s: Shape, r: Ray, xs: ^[dynamic]Intersection) {
 
 intersect :: proc(shape: Shape, r: Ray, xs: ^[dynamic]Intersection) {
 	// before intersecting a shape, the ray is transformed based on the shapes characteristics into object space
-	transformed_ray := ray_to_object_space(r, shape.transform)
+	transformed_ray := ray_to_object_space(r, shape.inverse_transform)
 	shape.local_intersect(shape, transformed_ray, xs)
 }
 
 ray_to_object_space :: proc(r: Ray, m: matrix[4, 4]f32) -> Ray {
-	inverse_m := linalg.inverse(m)
-	return transform(r, inverse_m)
+	return transform(r, m)
 }
 
 // Applies a shape's transform matrix  to a Ray
@@ -66,7 +66,10 @@ transform :: proc(r: Ray, m: matrix[4, 4]f32) -> Ray {
 	}
 	return temp
 }
-
+set_transform :: proc(shape: ^Shape, transform: matrix[4, 4]f32) {
+	shape.transform = transform
+	shape.inverse_transform = linalg.inverse(transform)
+}
 // this is  just to keep some old test cases from breaking, make shape should be used otherwise
 make_sphere :: proc(id: uint = 1) -> Shape {
 	return make_shape(.Sphere)
@@ -77,6 +80,7 @@ make_shape :: proc(kind: Shape_Kind, id: uint = 1) -> Shape {
 	shape.kind = kind
 	shape.id = id
 	shape.transform = identity_matrix()
+	shape.inverse_transform = identity_matrix()
 	shape.material = material()
 	#partial switch kind {
 	case .Sphere:
@@ -98,11 +102,10 @@ normal_at_plane :: proc(s: Shape, p: vec4) -> vec4 {
 }
 
 normal_at :: proc(s: Shape, p: vec4) -> vec4 {
-	inverse_transform := linalg.inverse(s.transform)
-	local_point := inverse_transform * p
+	local_point := s.inverse_transform * p
 	local_normal: vec4
 	local_normal = s.local_normal_at(s, local_point)
-	world_normal := linalg.transpose(inverse_transform) * local_normal
+	world_normal := linalg.transpose(s.inverse_transform) * local_normal
 	world_normal.w = 0.0
 	return linalg.normalize(world_normal)
 }
