@@ -11,6 +11,7 @@ Shape :: struct {
 	kind:              Shape_Kind,
 	transform:         matrix[4, 4]f32,
 	inverse_transform: matrix[4, 4]f32,
+	normals_transform: matrix[4, 4]f32,
 	material:          Material,
 	id:                uint,
 	local_normal_at:   proc(s: Shape, p: vec4) -> vec4,
@@ -69,6 +70,7 @@ transform :: proc(r: Ray, m: matrix[4, 4]f32) -> Ray {
 set_transform :: proc(shape: ^Shape, transform: matrix[4, 4]f32) {
 	shape.transform = transform
 	shape.inverse_transform = linalg.inverse(transform)
+	shape.normals_transform = linalg.transpose(shape.inverse_transform)
 }
 // this is  just to keep some old test cases from breaking, make shape should be used otherwise
 make_sphere :: proc(id: uint = 1) -> Shape {
@@ -81,6 +83,7 @@ make_shape :: proc(kind: Shape_Kind, id: uint = 1) -> Shape {
 	shape.id = id
 	shape.transform = identity_matrix()
 	shape.inverse_transform = identity_matrix()
+	shape.normals_transform = identity_matrix()
 	shape.material = material()
 	#partial switch kind {
 	case .Sphere:
@@ -105,7 +108,7 @@ normal_at :: proc(s: Shape, p: vec4) -> vec4 {
 	local_point := s.inverse_transform * p
 	local_normal: vec4
 	local_normal = s.local_normal_at(s, local_point)
-	world_normal := linalg.transpose(s.inverse_transform) * local_normal
+	world_normal := s.normals_transform * local_normal
 	world_normal.w = 0.0
 	return linalg.normalize(world_normal)
 }
